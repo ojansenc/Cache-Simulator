@@ -183,8 +183,6 @@ void Cache::read(unsigned long address, RAM& mem) {
 			for (auto it = sets.at(idx).begin(); it != sets.at(idx).end(); it++) {
 				if ((*it).tag == evictionLine) {
 					//swap eviction place up one
-					if (evictionSets.at(idx).size() > 1) 
-						std::iter_swap(evictionSets.at(idx).begin(),evictionSets.at(idx).begin()+1);
 					evictionLine = std::distance(sets.at(idx).begin(),it);
 					break;
 				}
@@ -193,6 +191,7 @@ void Cache::read(unsigned long address, RAM& mem) {
 				replaceEviction(sets.at(idx).at(evictionLine));
 		}
 		//now do our normal read stuff
+		evictionSets.at(idx)[0] = tag;
 		readAction(sets.at(idx).at(evictionLine));
 		sets.at(idx).at(evictionLine).tag = tag;
 		sets.at(idx).at(evictionLine).dirty = 0;
@@ -228,7 +227,8 @@ void Cache::write(int value, unsigned long address, RAM& mem) {
 	std::bitset<8> addressBits{address};
 	int offset, idx, tag;
 	readWriteInit(addressBits, offset, idx, tag);
-	//std::cout << "offset: " << offset << " idx: " << idx << " tag: " << tag << std::endl;
+	std::cout << "offset: " << offset << " idx: " << idx << " tag: " << tag << std::endl;
+	for (const auto& it : evictionSets.at(idx)) std::cout << it << ' ' << std::endl;
 	
 	//lambda that does write functionality
 	auto writeAction = [&](Reg& writeReg) {
@@ -241,9 +241,9 @@ void Cache::write(int value, unsigned long address, RAM& mem) {
 				break;
 			}
 		}
-		int tempAddress = address;
-		tempAddress -= tempAddress % blockSize;
 		if (!hit && wmiss == 1) {
+			int tempAddress = address;
+			tempAddress -= tempAddress % blockSize;
 			for (auto& iter : writeReg.data) {
 				if (tempAddress < mem.size) iter = mem.memory.at(tempAddress++);
 				else iter = 0;
@@ -253,9 +253,7 @@ void Cache::write(int value, unsigned long address, RAM& mem) {
 		writeReg.data.at(offset) = value;
 		//handle particularities of whit policies
 		if (whit == 1) mem.memory.at(address) = value;
-		else if (whit == 2) {
-			dirty = writeReg.dirty = 1;
-		}
+		else if (whit == 2) dirty = writeReg.dirty = 1;
 	};
 
 	//write if we have a hit
@@ -314,8 +312,6 @@ void Cache::write(int value, unsigned long address, RAM& mem) {
 			evictionLine = evictionSets.at(idx).at(0);
 			for (auto it = sets.at(idx).begin(); it != sets.at(idx).end(); it++) {
 				if ((*it).tag == evictionLine) {
-					if (evictionSets.at(idx).size() > 1)
-						std::iter_swap(evictionSets.at(idx).begin(),evictionSets.at(idx).begin()+1);
 					evictionLine = std::distance(sets.at(idx).begin(),it);
 					break;
 				}
@@ -323,6 +319,7 @@ void Cache::write(int value, unsigned long address, RAM& mem) {
 			if(sets.at(idx).at(evictionLine).dirty == 1)
 				replaceEviction(sets.at(idx).at(evictionLine));
 		}
+		evictionSets.at(idx)[0] = tag;
 		sets.at(idx).at(evictionLine).tag = tag;
 		sets.at(idx).at(evictionLine).dirty = 0;
 		sets.at(idx).at(evictionLine).valid = 1;
