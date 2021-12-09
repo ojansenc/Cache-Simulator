@@ -117,12 +117,14 @@ void Cache::read(unsigned long address, RAM& mem) {
 			}
 		}
 		//tempaddress to get to the start of data block
-		int tempAddress = address;
-		tempAddress -= tempAddress % blockSize;
-		for (auto& iter : readReg.data) {
-			//fill reg with memory from ram
-			if (tempAddress < mem.size) iter = mem.memory.at(tempAddress++);
-			else iter = 0;
+		if (!hit) {
+			int tempAddress = address;
+			tempAddress -= tempAddress % blockSize;
+			for (auto& iter : readReg.data) {
+				//fill reg with memory from ram
+				if (tempAddress < mem.size) iter = mem.memory.at(tempAddress++);
+				else iter = 0;
+			}
 		}
 		//if didnt find in eviction set add it
 		if (!found) evictionSets.at(idx).push_back(tag);
@@ -135,7 +137,7 @@ void Cache::read(unsigned long address, RAM& mem) {
 			if (it.valid == 1) {
 				hit = true;
 				numOfHits++;
-				data = it.data.at(offset);
+				readAction(it);
 				break;
 			}
 		}
@@ -181,7 +183,8 @@ void Cache::read(unsigned long address, RAM& mem) {
 			for (auto it = sets.at(idx).begin(); it != sets.at(idx).end(); it++) {
 				if ((*it).tag == evictionLine) {
 					//swap eviction place up one
-					std::iter_swap(evictionSets.at(idx).begin(),evictionSets.at(idx).begin()+1);
+					if (evictionSets.at(idx).size() > 1) 
+						std::iter_swap(evictionSets.at(idx).begin(),evictionSets.at(idx).begin()+1);
 					evictionLine = std::distance(sets.at(idx).begin(),it);
 					break;
 				}
@@ -311,7 +314,8 @@ void Cache::write(int value, unsigned long address, RAM& mem) {
 			evictionLine = evictionSets.at(idx).at(0);
 			for (auto it = sets.at(idx).begin(); it != sets.at(idx).end(); it++) {
 				if ((*it).tag == evictionLine) {
-					std::iter_swap(evictionSets.at(idx).begin(),evictionSets.at(idx).begin()+1);
+					if (evictionSets.at(idx).size() > 1)
+						std::iter_swap(evictionSets.at(idx).begin(),evictionSets.at(idx).begin()+1);
 					evictionLine = std::distance(sets.at(idx).begin(),it);
 					break;
 				}
